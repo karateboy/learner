@@ -73,3 +73,13 @@ export const getHistoryData = ({ monitorTypes, start, end }) => {
     }
   })
 }
+
+export const getLandLaw = ({ offset }) => {
+  return axios.request({
+    url: 'landLaw',
+    method: 'get',
+    params: {
+      offset
+    }
+  })
+}

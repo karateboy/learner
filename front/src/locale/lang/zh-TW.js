@@ -43,14 +43,8 @@ export default {
   org_tree_page: '組織結構樹',
   drag_drawer_page: '可拖動抽屜',
   tree_select_page: '樹狀下拉選擇器',
-  realtime: '即時測值',
-  query_data: '資料查詢',
-  error_log: '異常履歷',
-  config: '參數設定',
-  data_query: '資料查詢',
-  realtime_data: '即時測值',
-  history_data: '歷史資料',
-  history_trend: '歷史趨勢',
-  report: '報表查詢',
-  plc_config: 'PLC 設定'
+  learn_area: '學習區',
+  landLaw: '土地法',
+  config: '設定',
+  member_setting: '使用者設定'
 }

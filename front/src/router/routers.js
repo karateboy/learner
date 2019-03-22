@@ -50,49 +50,23 @@ export default [
     ]
   },
   {
-    path: '/data_query',
-    name: 'data_query',
+    path: '',
+    name: 'learn_area',
     meta: {
       icon: 'md-stats',
-      title: '資料查詢'
+      title: '學習區',
+      showAlways: true
     },
     component: Main,
     children: [
       {
-        path: 'realtime_data',
-        name: 'realtime_data',
+        path: 'landLaw',
+        name: 'landLaw',
         meta: {
           icon: 'md-trending-up',
-          title: '即時資料'
+          title: '土地法'
         },
-        component: () => import('@/view/single-page/home')
-      },
-      {
-        path: 'history_data',
-        name: 'history_data',
-        meta: {
-          icon: 'md-eye',
-          title: '歷史資料'
-        },
-        component: () => import('@/view/historyData/historyData')
-      },
-      {
-        path: 'history_trend',
-        name: 'history_trend',
-        meta: {
-          icon: 'md-trending-down',
-          title: '歷史趨勢'
-        },
-        component: () => import('@/view/single-page/home')
-      },
-      {
-        path: 'report',
-        name: 'report',
-        meta: {
-          icon: 'md-book',
-          title: '歷史資料'
-        },
-        component: () => import('@/view/single-page/home')
+        component: () => import('@/view/single-page/landLaw/landLaw')
       }
     ]
   },

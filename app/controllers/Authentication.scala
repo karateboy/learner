@@ -3,6 +3,7 @@ import play.api._
 import play.api.mvc.Security._
 import play.api.mvc._
 import scala.concurrent._
+import play.api.libs.json._
 
 case class UserInfo(id: String, name: String, groupId: String)
 

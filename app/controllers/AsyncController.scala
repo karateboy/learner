@@ -7,6 +7,8 @@ import play.api.mvc._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import models._
+import play.api.libs.json._
 
 /**
  * This controller creates an `Action` that demonstrates how to write
@@ -24,7 +26,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
  * a blocking API.
  */
 @Singleton
-class AsyncController @Inject()(cc: ControllerComponents, actorSystem: ActorSystem)(implicit exec: ExecutionContext) extends AbstractController(cc) {
+class AsyncController @Inject()(cc: ControllerComponents, actorSystem: ActorSystem, landLaw:LandLaw)(implicit exec: ExecutionContext) extends Authentication(cc) {
 
   /**
    * Creates an Action that returns a plain text message after a delay
@@ -46,4 +48,11 @@ class AsyncController @Inject()(cc: ControllerComponents, actorSystem: ActorSyst
     promise.future
   }
 
+  def getLandLaw(offset:Int) = Authenticated.async {
+    val lawF = landLaw.query(QueryParam())(offset, 1)
+    for(laws <- lawF) yield {
+      implicit val writes = Json.writes[models.Law] 
+      Ok(Json.toJson(laws(0)))
+    }
+  }
 }
