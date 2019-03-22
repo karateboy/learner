@@ -25,7 +25,7 @@ class Module extends AbstractModule {
     // Set AtomicCounter as the implementation for Counter.
     bind(classOf[Counter]).to(classOf[AtomicCounter])
     bind(classOf[MongoDB]).asEagerSingleton()   
-    //bind(classOf[LandLaw]).asEagerSingleton()
+    bind(classOf[LandLaw]).asEagerSingleton()
   }
 
 }
