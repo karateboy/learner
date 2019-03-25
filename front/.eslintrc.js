@@ -15,7 +15,10 @@ module.exports = {
     'no-undef': 'off',
     'camelcase': 'off',
     'no-extra-semi': 'off',
-    'space-before-function-paren': ["error", "never"]
+    'semi': 'off',
+    'space-before-function-paren': 'off',
+    'new-cap': 'off',
+    'quotes': 'off'
   },
   parserOptions: {
     parser: 'babel-eslint'

@@ -91,7 +91,23 @@ export default {
       this.fetchLaw();
     },
     speak() {
-     
+      if ("speechSynthesis" in window) {
+        let synth = window.speechSynthesis;
+        let voices = synth.getVoices();
+        let utterThis = new SpeechSynthesisUtterance(this.law.content);
+
+        let twVoice = voices.filter(v => {
+          return v.lang === "zh-TW";
+        });
+
+        utterThis.voice = twVoice[0];
+
+        utterThis.pitch = 1;
+        utterThis.rate = 1;
+        synth.speak(utterThis);
+      } else {
+        alert("speechSynthesis is not supported!");
+      }
     },
     query() {
       this.display = true;
@@ -135,8 +151,7 @@ export default {
         .catch(err => {
           alert(err);
         });
-    },
-    speak() {}
+    }
   }
 };
 </script>
