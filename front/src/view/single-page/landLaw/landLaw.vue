@@ -33,7 +33,7 @@
           </Form>
         </Card>
         <Modal v-model="add_keyword_modal" title="增加圖片" @on-ok="onAddKeyword">
-          <Form ref="form_add_keyword" :model="add_keyword" inline>
+          <Form ref="form_add_keyword" :model="add_keyword" inline :closable="false">
             <FormItem label="關鍵字">
               <Input type="text" v-model="add_keyword.key" placeholder="關鍵字..."></Input>
             </FormItem>
