@@ -64,22 +64,57 @@ export const getMonitorTypes = () => {
   })
 }
 
-export const getHistoryData = ({ monitorTypes, start, end }) => {
+export const getHistoryData = ({
+  monitorTypes,
+  start,
+  end
+}) => {
   return axios.request({
     url: 'history_data',
     method: 'get',
     params: {
-      monitorTypes, start, end
+      monitorTypes,
+      start,
+      end
     }
   })
 }
 
-export const getLandLaw = ({ offset }) => {
+export const getLandLaw = ({
+  offset
+}) => {
   return axios.request({
     url: 'landLaw',
     method: 'get',
     params: {
       offset
     }
+  })
+}
+
+export const getLandLawCount = () => {
+  return axios.request({
+    url: 'landLaw/count',
+    method: 'get',
+    params: {}
+  })
+}
+
+export const upsertLandLaw = ({
+  study
+}) => {
+  return axios.request({
+    url: 'landLaw',
+    method: 'post',
+    data: study
+  })
+}
+
+export const delLandLaw = (
+  _id
+) => {
+  return axios.request({
+    url: `landLaw/${_id}`,
+    method: 'delete'
   })
 }

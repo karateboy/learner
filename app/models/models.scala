@@ -33,6 +33,13 @@ object ModelHelper {
   }
 
   import scala.concurrent._
+  import scala.util._
+  def completeHandler[T](t: Try[T]) = {
+    t match {
+      case Success(ret)=> //Ignore...
+      case Failure(ex) => Logger.error("Error=>", ex)
+    }
+  }
 
   def waitReadyResult[T](f: Future[T], ignoreError: Boolean = false) = {
     import scala.concurrent.duration._
@@ -133,32 +140,32 @@ object EnumUtils {
 
 import org.mongodb.scala.bson.ObjectId
 object ObjectIdUtil {
-//  def objectIdReads: Reads[ObjectId] = new Reads[ObjectId] {
-//    def reads(json: JsValue): JsResult[ObjectId] = json match {
-//      case JsString(s) => {
-//        try {
-//          JsSuccess(new ObjectId(s))
-//        } catch {
-//          case _: NoSuchElementException => JsError(s"unexpected ObjectId")
-//        }
-//      }
-//      case _ => JsError("String value expected")
-//    }
-//  }
-//
-//  implicit def objectIdOptReads: Reads[Option[ObjectId]] = new Reads[Option[ObjectId]] {
-//    def reads(json: JsValue): JsResult[Option[ObjectId]] = json match {
-//      case JsString(s) => {
-//        try {
-//          JsSuccess(Some(new ObjectId(s)))
-//        } catch {
-//          case _: Throwable =>
-//            JsSuccess(None)
-//        }
-//      }
-//      case _ => JsSuccess(None)
-//    }
-//  }
+  //  def objectIdReads: Reads[ObjectId] = new Reads[ObjectId] {
+  //    def reads(json: JsValue): JsResult[ObjectId] = json match {
+  //      case JsString(s) => {
+  //        try {
+  //          JsSuccess(new ObjectId(s))
+  //        } catch {
+  //          case _: NoSuchElementException => JsError(s"unexpected ObjectId")
+  //        }
+  //      }
+  //      case _ => JsError("String value expected")
+  //    }
+  //  }
+  //
+  //  implicit def objectIdOptReads: Reads[Option[ObjectId]] = new Reads[Option[ObjectId]] {
+  //    def reads(json: JsValue): JsResult[Option[ObjectId]] = json match {
+  //      case JsString(s) => {
+  //        try {
+  //          JsSuccess(Some(new ObjectId(s)))
+  //        } catch {
+  //          case _: Throwable =>
+  //            JsSuccess(None)
+  //        }
+  //      }
+  //      case _ => JsSuccess(None)
+  //    }
+  //  }
   implicit def objectWrites: Writes[ObjectId] = new Writes[ObjectId] {
     def writes(v: ObjectId): JsValue = JsString(v.toHexString)
   }

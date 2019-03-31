@@ -3,34 +3,56 @@
     <Row>
       <Col>
         <Card>
-          <Form :model="formItem" :label-width="80">
-            <FormItem label="編">
-              <Input v-model="law.module" placeholder="編" style="width: 300px"/>
-            </FormItem>
-            <FormItem label="章">
-              <Input v-model="law.chapter" placeholder="章" style="width: 300px"/>
-            </FormItem>
-            <FormItem label="條">
-              <Input v-model="law.no" placeholder="條" style="width: 300px"/>
+          <Form :label-width="80">
+            <FormItem label="進度">
+              <Progress :percent="progress">{{`${offset+1}/${count+1}`}}</Progress>
             </FormItem>
             <FormItem label="內容">
-              <Input v-model="law.content" placeholder="..." type="textarea" :rows="4"/>
+              <Input v-model="study.content" placeholder="..." type="textarea" :rows="4"/>
             </FormItem>
 
             <FormItem>
-              <Button type="primary" style="margin-left: 8px" @click="pre">前一條</Button>
+              <Button
+                type="primary"
+                style="margin-left: 8px"
+                @click="pre"
+                :disabled="offset===0"
+              >&lt;</Button>
               <Button type="primary" style="margin-left: 8px" @click="speak">朗誦</Button>
-              <Button type="primary" style="margin-left: 8px" @click="next">後一條</Button>
+              <Button type="primary" style="margin-left: 8px" @click="show_add_keyword_dlg">增加圖片</Button>
+              <Button type="primary" style="margin-left: 8px" @click="clear_keywords">清除圖片</Button>
+              <Button type="primary" style="margin-left: 8px" @click="upsert">儲存</Button>
+              <Button type="primary" style="margin-left: 8px" @click="del">刪除</Button>
+              <Button
+                type="primary"
+                style="margin-left: 8px"
+                @click="next"
+                :disabled="offset>=count"
+              >&gt;</Button>
             </FormItem>
           </Form>
         </Card>
+        <Modal v-model="add_keyword_modal" title="增加圖片" @on-ok="onAddKeyword">
+          <Form ref="form_add_keyword" :model="add_keyword" inline>
+            <FormItem label="關鍵字">
+              <Input type="text" v-model="add_keyword.key" placeholder="關鍵字..."></Input>
+            </FormItem>
+            <FormItem label="url">
+              <Input type="url" v-model="add_keyword.url" placeholder="http://..."></Input>
+            </FormItem>
+          </Form>
+        </Modal>
       </Col>
     </Row>
     <Row>
-      <Col>
-        <Card v-if="display">
-          <Table :columns="columns" :data="rows"></Table>
-        </Card>
+      <Col v-if="study.keywords.length">
+        <Carousel v-model="keyword_idx" :autoplay="true">
+          <CarouselItem v-for="keyword in study.keywords" :key="keyword.key">
+            <Card :title="keyword.key">
+              <img :src="keyword.url">
+            </Card>
+          </CarouselItem>
+        </Carousel>
       </Col>
     </Row>
   </div>
@@ -38,44 +60,61 @@
 <style scoped>
 </style>
 <script>
-import moment from "moment";
-import { getLandLaw } from "@/api/data";
+import {
+  getLandLaw,
+  getLandLawCount,
+  upsertLandLaw,
+  delLandLaw
+} from "@/api/data";
 export default {
   name: "landLaw",
   mounted() {
+    this.fetchLawCount();
     this.fetchLaw();
   },
   data() {
     return {
       offset: 0,
-      law: {
-        module: "",
-        chapter: "",
-        no: "",
+      count: 0,
+      add_keyword_modal: false,
+      add_keyword: {
+        key: "test",
+        url: "http://www.google.com/"
+      },
+      keyword_idx: 0,
+      study: {
+        _id: "000000000000000000000000",
         content: "",
-        terms: []
-      },
-      formItem: {
-        monitorTypes: [],
-        dateRange: "",
-        start: undefined,
-        end: undefined
-      },
-      display: false,
-      columns: [],
-      rows: []
+        keywords: []
+      }
     };
   },
-  computed: {},
+  computed: {
+    progress() {
+      return Math.ceil((this.offset * 100) / (this.count + 1));
+    }
+  },
   methods: {
     fetchLaw() {
       getLandLaw({ offset: this.offset })
         .then(resp => {
           const data = resp.data;
-          this.law.module = data.module;
-          this.law.chapter = data.chapter;
-          this.law.no = data.no;
-          this.law.content = data.content;
+          this.study._id = data._id;
+          this.study.content = data.content;
+          this.study.keywords.splice(0, this.study.keywords.length);
+          for (let key of data.keywords) {
+            this.study.keywords.push(key);
+          }
+        })
+        .catch(err => {
+          alert(err);
+        });
+    },
+    fetchLawCount() {
+      getLandLawCount()
+        .then(resp => {
+          const data = resp.data;
+          this.count = data.count;
         })
         .catch(err => {
           alert(err);
@@ -90,11 +129,43 @@ export default {
       this.offset += 1;
       this.fetchLaw();
     },
+    show_add_keyword_dlg() {
+      this.add_keyword_modal = true;
+    },
+    clear_keywords() {
+      this.study.keywords.splice(0, this.study.keywords.length);
+    },
+    onAddKeyword() {
+      let new_keyword = Object.assign({}, this.add_keyword);
+      this.add_keyword.key = ""
+      this.add_keyword.url = ""
+      this.study.keywords.push(new_keyword);
+    },
+    upsert() {
+      upsertLandLaw({ study: this.study })
+        .then(resp => {
+          this.$Message.info("成功");
+        })
+        .catch(err => {
+          alert(err);
+        });
+    },
+    del() {
+      delLandLaw(this.study._id)
+        .then(resp => {
+          const data = resp.data;
+          this.count -= data.count;
+          if (this.offset >= this.count) this.offset = this.count - 1;
+
+          this.fetchLaw();
+        })
+        .catch(err => alert(err));
+    },
     speak() {
       if ("speechSynthesis" in window) {
         let synth = window.speechSynthesis;
         let voices = synth.getVoices();
-        let utterThis = new SpeechSynthesisUtterance(this.law.content);
+        let utterThis = new SpeechSynthesisUtterance(this.study.content);
 
         let twVoice = voices.filter(v => {
           return v.lang === "zh-TW";
@@ -108,49 +179,6 @@ export default {
       } else {
         alert("speechSynthesis is not supported!");
       }
-    },
-    query() {
-      this.display = true;
-      this.formItem.start = this.formItem.dateRange[0].getTime();
-      this.formItem.end = this.formItem.dateRange[1].getTime();
-      getHistoryData({
-        monitorTypes: encodeURIComponent(this.formItem.monitorTypes.join(",")),
-        start: this.formItem.start,
-        end: this.formItem.end
-      })
-        .then(resp => {
-          const ret = resp.data;
-          this.columns.splice(0, this.columns.length);
-          this.rows.splice(0, this.rows.length);
-          this.columns.push({
-            title: "日期",
-            key: "date",
-            sortable: true
-          });
-          for (let i = 0; i < ret.columnNames.length; i++) {
-            let col = {
-              title: ret.columnNames[i],
-              key: `col${i}`,
-              sortable: true
-            };
-            this.columns.push(col);
-          }
-          for (let row of ret.rows) {
-            let rowData = {
-              date: new moment(row.date).format("lll"),
-              cellClassName: {}
-            };
-            for (let c = 0; c < row.cellData.length; c++) {
-              let key = `col${c}`;
-              rowData[key] = row.cellData[c].v;
-              rowData.cellClassName[key] = row.cellData[c].cellClassName;
-            }
-            this.rows.push(rowData);
-          }
-        })
-        .catch(err => {
-          alert(err);
-        });
     }
   }
 };

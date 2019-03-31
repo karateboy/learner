@@ -22,13 +22,13 @@ class SysConfig @Inject() (mongoDB: MongoDB) {
   def init() {
     if (!mongoDB.colNames.contains(ColName)) {
       val f = mongoDB.database.createCollection(ColName).toFuture()
-      f.onFailure(errorHandler)
+      f.onComplete(completeHandler)
     }
 
     val idSet = defaultConfig.keys map { _.toString() }
     //Clean up unused
     val f1 = collection.deleteMany(Filters.not(Filters.in("_id", idSet.toList: _*))).toFuture()
-    f1.onFailure(errorHandler)
+    f1.onComplete(completeHandler)
     val updateModels =
       for ((k, defaultDoc) <- defaultConfig) yield {
         UpdateOneModel(
@@ -46,13 +46,13 @@ class SysConfig @Inject() (mongoDB: MongoDB) {
   def upsert(_id: Symbol, doc: Document) = {
     val uo = new UpdateOptions().upsert(true)
     val f = collection.replaceOne(Filters.equal("_id", _id.toString()), doc, uo).toFuture()
-    f.onFailure(errorHandler)
+    f.onComplete(completeHandler)
     f
   }
 
   def get(_id: Symbol) = {
     val f = collection.find(Filters.eq("_id", _id.toString())).headOption()
-    f.onFailure(errorHandler)
+    f.onComplete(completeHandler)
     for (ret <- f) yield {
       val doc = ret.getOrElse(defaultConfig(_id))
       doc("value")

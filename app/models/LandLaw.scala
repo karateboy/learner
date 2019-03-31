@@ -6,63 +6,59 @@ import scala.language.implicitConversions
 import scala.collection.JavaConverters._
 import ModelHelper._
 import play.api.libs.json._
-case class Law(_id: String, module: String, chapter: String, no: String, content: String, terms: Seq[String])
-case class QueryParam(sortBy: String = "no+")
+import org.mongodb.scala.bson._
 
-@Singleton
-class LandLaw @Inject() (mongoDB: MongoDB) {
-
-  
-
+object LandLaw {
+  case class QueryParam(sortBy: String = "_id+")
   import org.mongodb.scala.bson.codecs.Macros._
   import org.mongodb.scala.bson.codecs.DEFAULT_CODEC_REGISTRY
   import org.bson.codecs.configuration.CodecRegistries.{ fromRegistries, fromProviders }
   import org.mongodb.scala.model._
   import org.mongodb.scala.model.Indexes._
   import org.mongodb.scala.bson._
+  import LandLaw._
 
-  val codecRegistry = fromRegistries(fromProviders(classOf[Law]), DEFAULT_CODEC_REGISTRY)
+  val codecRegistry = fromRegistries(fromProviders(classOf[Study], classOf[KeyWord]), DEFAULT_CODEC_REGISTRY)
 
   val ColName = "landLaw"
-  val collection = mongoDB.database.getCollection[Law](ColName).withCodecRegistry(codecRegistry)
 
-  def init() {
-    if (!mongoDB.colNames.contains(ColName)) {
-      val f = mongoDB.database.createCollection(ColName).toFuture()
-      waitReadyResult(f)      
-      //val cif = collection.createIndex(Indexes.ascending("no")).toFuture()
-      //waitReadyResult(cif)
-      importLaw
-    }
+}
+
+@Singleton
+class LandLaw @Inject() (mongoDB: MongoDB) {
+  import LandLaw._
+  val collection = mongoDB.database.getCollection[Study](ColName).withCodecRegistry(codecRegistry)
+
+  if (!mongoDB.colNames.contains(ColName)) {
+    val f = mongoDB.database.createCollection(ColName).toFuture()
+    f.onComplete(completeHandler)
+    waitReadyResult(f)
+    //val cif = collection.createIndex(Indexes.ascending("no")).toFuture()
+    //waitReadyResult(cif)
+    importLaw
   }
-  
-  init
-  
+
   def importLaw() = {
     import org.jsoup._
 
     val doc = Jsoup.connect("https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0060001").get();
     val tags = doc.select("div#pnLawFla").select(".law-reg-content").asScala
-    var module = ""
-    var chapter = ""
-    var laws = Seq.empty[Law]
+    var laws = Seq.empty[Study]
     for (div <- tags) {
       for (ele <- div.children().asScala) {
         ele.className() match {
-          case "h3 char-1" =>
-            module = ele.text()
-          case "h3 char-2" =>
-            chapter = ele.text()
           case "row" =>
-            val col_no = ele.select(".col-no").select("a").text()
             val content = ele.select(".col-data").text()
-            val law = Law(col_no, module, chapter, col_no, content, Seq.empty[String])
+            val law = Study(new ObjectId(), content, Seq.empty[KeyWord])
             laws = laws :+ (law)
+          case _ =>
+          // Ignore...
         }
       }
     }
     Logger.info(s"total ${laws.size} laws")
     val f = collection.insertMany(laws).toFuture()
+    f.onComplete(completeHandler)
     waitReadyResult(f)
   }
 
@@ -135,7 +131,7 @@ class LandLaw @Inject() (mongoDB: MongoDB) {
     Filters.exists("_id")
   }
 
-  def query(param: QueryParam)(skip: Int, limit: Int): Future[Seq[Law]] = {
+  def query(param: QueryParam)(skip: Int, limit: Int): Future[Seq[Study]] = {
     val filter = getFilter(param)
     val sortBy = getSortBy(param)
     query(filter)(sortBy)(skip, limit)
@@ -144,14 +140,26 @@ class LandLaw @Inject() (mongoDB: MongoDB) {
   import org.mongodb.scala.bson.conversions.Bson
   def query(filter: Bson)(sortBy: Bson = Sorts.descending("siteInfo.area"))(skip: Int, limit: Int) = {
     val f = collection.find((filter)).skip(skip).limit(limit).toFuture()
-    f.onFailure(errorHandler)
+    f.onComplete(completeHandler)
     f
   }
 
   def count(param: QueryParam): Future[Long] = count(getFilter(param))
   def count(filter: Bson) = {
     val f = collection.count((filter)).toFuture()
-    f.onFailure(errorHandler)
+    f.onComplete(completeHandler)
+    f
+  }
+  
+  def upsert(study:Study) = {
+    val f = collection.replaceOne(Filters.eq("_id", study._id), study, UpdateOptions().upsert(true)).toFuture()
+    f.onComplete(completeHandler)
+    f
+  }
+  
+  def delete(_id:ObjectId)={
+    val f = collection.deleteOne(Filters.eq("_id", _id)).toFuture()
+    f.onComplete(completeHandler)
     f
   }
 }

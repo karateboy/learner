@@ -4,9 +4,9 @@ import javax.inject._
 
 import akka.actor.ActorSystem
 import play.api.mvc._
-
+import play.api._
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ ExecutionContext, Future, Promise }
 import models._
 import play.api.libs.json._
 
@@ -26,7 +26,7 @@ import play.api.libs.json._
  * a blocking API.
  */
 @Singleton
-class AsyncController @Inject()(cc: ControllerComponents, actorSystem: ActorSystem, landLaw:LandLaw)(implicit exec: ExecutionContext) extends Authentication(cc) {
+class AsyncController @Inject() (cc: ControllerComponents, actorSystem: ActorSystem, landLaw: LandLaw, photo: Photo)(implicit exec: ExecutionContext) extends Authentication(cc) {
 
   /**
    * Creates an Action that returns a plain text message after a delay
@@ -48,11 +48,89 @@ class AsyncController @Inject()(cc: ControllerComponents, actorSystem: ActorSyst
     promise.future
   }
 
-  def getLandLaw(offset:Int) = Authenticated.async {
-    val lawF = landLaw.query(QueryParam())(offset, 1)
-    for(laws <- lawF) yield {
-      implicit val writes = Json.writes[models.Law] 
-      Ok(Json.toJson(laws(0)))
+  def getLandLaw(offset: Int) = Authenticated.async {
+    import LandLaw._
+    val studyF = landLaw.query(QueryParam())(offset, 1)
+    for (studies <- studyF) yield {
+      import Study._
+      if (studies.isEmpty)
+        Ok(Json.toJson(Study.emptyStudy))
+      else
+        Ok(Json.toJson(studies(0)))
+    }
+  }
+
+  def getLandLawCount = Authenticated.async {
+    import LandLaw._
+    val countF = landLaw.count(QueryParam())
+    for (count <- countF) yield {
+      Ok(Json.obj("count" -> count))
+    }
+  }
+
+  def upsertLandLaw = Authenticated.async(parse.json) {
+    implicit request =>
+      import Study._
+      val ret = request.body.validate[Study]
+      ret.fold(
+        error => {
+          Logger.error(JsError.toJson(error).toString())
+          Future { BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString())) }
+        },
+        studyCase => {
+          val f = landLaw.upsert(studyCase)
+          for (ret <- f) yield {
+            Ok(Json.obj("ok" -> ret.getModifiedCount))
+          }
+        })
+  }
+  def delLandLaw(id: String) = Authenticated.async {
+    import LandLaw._
+    import org.mongodb.scala.bson._
+    val _id = new ObjectId(id)
+    val f = landLaw.delete(_id)
+    for (ret <- f) yield {
+      Ok(Json.obj("count" -> ret.getDeletedCount))
+    }
+  }
+
+  import scala.concurrent._
+  import java.nio.file._
+  def uploadPhoto = Authenticated.async(parse.multipartFormData) {
+    implicit request =>
+      import org.mongodb.scala.model._
+      import org.mongodb.scala.bson._
+
+      val seqF =
+        request.body.files map { upload =>
+          val filename = upload.filename
+          val contentType = upload.contentType
+          val path = upload.ref.path
+          val imageData = Files.readAllBytes(path);
+
+          val photoCase = PhotoCase(new ObjectId(), imageData)
+          for (ret <- photo.insert(photoCase)) yield photoCase._id
+        }
+      val f = Future.sequence(seqF)
+      for (objIds <- f) yield {
+        import ObjectIdUtil._
+        Ok(Json.toJson(objIds))
+      }
+  }
+
+  def getPhoto(id: String) = Authenticated.async {
+    import org.mongodb.scala.bson._
+    val noPhotoId = new ObjectId(Photo.noPhotoID)
+    val objId = new ObjectId(id)
+    if (objId == noPhotoId) {
+      Future {
+        NoContent
+      }
+    } else {
+      val f = photo.getPhoto(new ObjectId(id))
+      for (ret <- f) yield {
+        Ok(ret.image).as("image/jpeg")
+      }
     }
   }
 }

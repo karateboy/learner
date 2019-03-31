@@ -71,7 +71,7 @@ export default [
     ]
   },
   {
-    path: '/config',
+    path: '',
     name: 'config',
     meta: {
       icon: 'md-settings',
@@ -81,11 +81,11 @@ export default [
     component: Main,
     children: [
       {
-        path: 'plc_config',
-        name: 'plc_config',
+        path: 'member_setting',
+        name: 'member_setting',
         meta: {
           icon: 'md-laptop',
-          title: 'PLC設定'
+          title: '使用者設定'
         },
         component: () => import('@/view/single-page/home')
       }
