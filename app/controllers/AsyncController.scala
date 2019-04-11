@@ -26,7 +26,7 @@ import play.api.libs.json._
  * a blocking API.
  */
 @Singleton
-class AsyncController @Inject() (cc: ControllerComponents, actorSystem: ActorSystem, landLaw: LandLaw, photo: Photo)(implicit exec: ExecutionContext) extends Authentication(cc) {
+class AsyncController @Inject() (cc: ControllerComponents, actorSystem: ActorSystem, landLaw: LandLaw, photo: Photo, userOp: UserDB)(implicit exec: ExecutionContext) extends Authentication(cc) {
 
   /**
    * Creates an Action that returns a plain text message after a delay
@@ -49,23 +49,33 @@ class AsyncController @Inject() (cc: ControllerComponents, actorSystem: ActorSys
   }
 
   def getLandLaw(offset: Int) = Authenticated.async {
-    import LandLaw._
-    val studyF = landLaw.query(QueryParam())(offset, 1)
-    for (studies <- studyF) yield {
-      import Study._
-      if (studies.isEmpty)
-        Ok(Json.toJson(Study.emptyStudy))
-      else
-        Ok(Json.toJson(studies(0)))
-    }
+    implicit request =>
+      val userInfo = request.user
+      import LandLaw._
+      val studyF = landLaw.query(QueryParam(userInfo.id))(offset, 1)
+      val userF = userOp.get(userInfo.id)
+      for {
+        studies <- studyF
+        user <- userF
+      } yield {
+        import Study._
+        if (studies.isEmpty){
+          val seq = user.getNextSeq
+          userOp.upsert(user)
+          Ok(Json.toJson(Study.emptyStudy(userInfo.id, user.getNextSeq)))
+        }else
+          Ok(Json.toJson(studies(0)))
+      }
   }
 
   def getLandLawCount = Authenticated.async {
-    import LandLaw._
-    val countF = landLaw.count(QueryParam())
-    for (count <- countF) yield {
-      Ok(Json.obj("count" -> count))
-    }
+    implicit request =>
+      val userInfo = request.user
+      import LandLaw._
+      val countF = landLaw.count(QueryParam(userInfo.id))
+      for (count <- countF) yield {
+        Ok(Json.obj("count" -> count))
+      }
   }
 
   def upsertLandLaw = Authenticated.async(parse.json) {

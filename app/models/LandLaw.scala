@@ -6,17 +6,15 @@ import scala.language.implicitConversions
 import scala.collection.JavaConverters._
 import ModelHelper._
 import play.api.libs.json._
+import org.mongodb.scala.model._
+import org.mongodb.scala.model.Indexes._
 import org.mongodb.scala.bson._
 
 object LandLaw {
-  case class QueryParam(sortBy: String = "_id+")
+  case class QueryParam(owner: String, sortBy: String = "seq+")
   import org.mongodb.scala.bson.codecs.Macros._
   import org.mongodb.scala.bson.codecs.DEFAULT_CODEC_REGISTRY
   import org.bson.codecs.configuration.CodecRegistries.{ fromRegistries, fromProviders }
-  import org.mongodb.scala.model._
-  import org.mongodb.scala.model.Indexes._
-  import org.mongodb.scala.bson._
-  import LandLaw._
 
   val codecRegistry = fromRegistries(fromProviders(classOf[Study], classOf[KeyWord]), DEFAULT_CODEC_REGISTRY)
 
@@ -25,7 +23,7 @@ object LandLaw {
 }
 
 @Singleton
-class LandLaw @Inject() (mongoDB: MongoDB) {
+class LandLaw @Inject() (mongoDB: MongoDB, userOp: UserDB) {
   import LandLaw._
   val collection = mongoDB.database.getCollection[Study](ColName).withCodecRegistry(codecRegistry)
 
@@ -33,8 +31,8 @@ class LandLaw @Inject() (mongoDB: MongoDB) {
     val f = mongoDB.database.createCollection(ColName).toFuture()
     f.onComplete(completeHandler)
     waitReadyResult(f)
-    //val cif = collection.createIndex(Indexes.ascending("no")).toFuture()
-    //waitReadyResult(cif)
+    val cif = collection.createIndex(Indexes.ascending("owner", "seq")).toFuture()
+    waitReadyResult(cif)
     importLaw
   }
 
@@ -44,12 +42,20 @@ class LandLaw @Inject() (mongoDB: MongoDB) {
     val doc = Jsoup.connect("https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0060001").get();
     val tags = doc.select("div#pnLawFla").select(".law-reg-content").asScala
     var laws = Seq.empty[Study]
+    val user = User.defaultUsers.head
     for (div <- tags) {
       for (ele <- div.children().asScala) {
         ele.className() match {
           case "row" =>
             val content = ele.select(".col-data").text()
-            val law = Study(new ObjectId(), content, Seq.empty[KeyWord])
+
+            val law = Study(
+              _id = new ObjectId(),
+              owner = user._id,
+              seq = user.getNextSeq,
+              content = content,
+              keywords = Seq.empty[KeyWord])
+            userOp.upsert(user)
             laws = laws :+ (law)
           case _ =>
           // Ignore...
@@ -128,7 +134,7 @@ class LandLaw @Inject() (mongoDB: MongoDB) {
       Filters.exists("_id")
 	  */
 
-    Filters.exists("_id")
+    Filters.eq("owner", param.owner)
   }
 
   def query(param: QueryParam)(skip: Int, limit: Int): Future[Seq[Study]] = {
@@ -150,14 +156,14 @@ class LandLaw @Inject() (mongoDB: MongoDB) {
     f.onComplete(completeHandler)
     f
   }
-  
-  def upsert(study:Study) = {
+
+  def upsert(study: Study) = {
     val f = collection.replaceOne(Filters.eq("_id", study._id), study, UpdateOptions().upsert(true)).toFuture()
     f.onComplete(completeHandler)
     f
   }
-  
-  def delete(_id:ObjectId)={
+
+  def delete(_id: ObjectId) = {
     val f = collection.deleteOne(Filters.eq("_id", _id)).toFuture()
     f.onComplete(completeHandler)
     f

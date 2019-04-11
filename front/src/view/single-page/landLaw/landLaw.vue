@@ -40,6 +40,11 @@
             <FormItem label="url">
               <Input type="url" v-model="add_keyword.url" placeholder="http://..."></Input>
             </FormItem>
+            <FormItem label="上傳圖檔">
+              <Upload action="/photo">
+                <Button icon="ios-cloud-upload-outline">上傳圖檔</Button>
+              </Upload>
+            </FormItem>
           </Form>
         </Modal>
       </Col>

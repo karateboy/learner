@@ -1,31 +1,71 @@
 package models
 import javax.inject.{ Inject, Singleton }
 import play.api._
-import com.typesafe.config._
-import play.api.db.slick.DatabaseConfigProvider
-import slick.jdbc.JdbcProfile
 import scala.concurrent._
 import scala.collection.JavaConverters._
-case class User(id: String, password: String, name: String)
+import scala.concurrent.ExecutionContext.Implicits.global
+
+case class User(_id: String, password: String, name: String, var _seq: Double = 0) {
+  def getNextSeq = {
+    val ret = _seq
+    _seq += 1024
+    ret
+  }
+}
+
+object User {
+  import play.api.libs.json._
+  import org.mongodb.scala.bson.codecs.Macros._
+  import org.mongodb.scala.bson.codecs.DEFAULT_CODEC_REGISTRY
+  import org.bson.codecs.configuration.CodecRegistries.{ fromRegistries, fromProviders }
+  import org.mongodb.scala.model._
+  import org.mongodb.scala.model.Indexes._
+  import org.mongodb.scala.bson._
+
+  implicit val reads = Json.reads[User]
+  val codecRegistry = fromRegistries(fromProviders(classOf[User]), DEFAULT_CODEC_REGISTRY)
+
+  val ColName = "user"
+  val defaultUsers = Seq(
+    User("user", "abc123", "古煥文"),
+    User("karateboy", "abc123", "karateboy"))
+
+}
+
 @Singleton
-class UserDB @Inject() (config: Configuration) {
-  implicit val configLoader: ConfigLoader[Seq[User]] = new ConfigLoader[Seq[User]] {
-    def load(rootConfig: Config, path: String): Seq[User] = {
-      val userConfigList = rootConfig.getConfigList(path)
-      val users = for (userConfig <- userConfigList.asScala) yield {
-        val id = userConfig.getString("id")
-        val password = userConfig.getString("password")
-        val name = userConfig.getString("name")
-        User(id, password, name)
-      }
-      users
-    }
+class UserDB @Inject() (mongoDB: MongoDB) {
+  import User._
+  import MongoDB._
+  import ModelHelper._
+
+  if (!mongoDB.colNames.contains(ColName)) {
+    val f = mongoDB.database.createCollection(ColName).toFuture()
+    f.onComplete(completeHandler)
+    waitReadyResult(f)
+
+    val f2 = collection.insertMany(defaultUsers).toFuture()
+    f2.onComplete(completeHandler)
+    waitReadyResult(f2)
   }
 
-  val people = config.get[Seq[User]]("users")
+  lazy val collection = mongoDB.database.getCollection[User](ColName).withCodecRegistry(codecRegistry)
 
-  Logger.info(s"User = ${people.size}")
+  import org.mongodb.scala.model._
+  def get(_id: String) = {
+    val f = collection.find(Filters.eq("_id", _id)).first().toFuture()
+    f.onComplete(completeHandler)
+    f
+  }
 
-  def getUserById(id: String) = people.find(_.id == id)
+  def upsert(user: User) = {
+    val f = collection.replaceOne(Filters.eq("_id", user._id), user, UpdateOptions().upsert(true)).toFuture()
+    f.onComplete(completeHandler)
+    f
+  }
 
+  def delete(_id: String) = {
+    val f = collection.deleteOne(Filters.eq("_id", _id)).toFuture()
+    f.onComplete(completeHandler)
+    f
+  }
 }
