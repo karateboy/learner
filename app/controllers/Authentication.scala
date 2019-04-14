@@ -43,5 +43,5 @@ class Authentication(cc: ControllerComponents)(implicit ec: ExecutionContext)
 
   def getUserInfo[A]()(implicit request: Request[A]): Option[UserInfo] = getUserinfo(request)
 
-  def Authenticated = AuthenticatedBuilder(getUserinfo, cc.parsers.defaultBodyParser)
+  def Authenticated = AuthenticatedBuilder(getUserinfo, cc.parsers.defaultBodyParser, onUnauthorized)
 }

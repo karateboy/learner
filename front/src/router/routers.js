@@ -130,7 +130,7 @@ export const original = [
   },
   {
     path: '/',
-    name: '_home',
+    name: 'home',
     redirect: '/home',
     component: Main,
     meta: {
