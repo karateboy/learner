@@ -13,13 +13,14 @@
 
             <FormItem>
               <ButtonGroup>
-                <Button type="primary" @click="speak">朗誦</Button>
+                <Button type="primary" @click="speak">{{toggleSpeakTitle}}</Button>
                 <Button type="primary" @click="show_add_keyword_dlg">增加圖片</Button>
                 <Button
                   type="primary"
                   @click="del_keyword_modal=true"
                   :disabled="study.keywords.length === 0"
                 >刪除圖片</Button>
+                <Button type="primary" @click="newStudy">新增</Button>
                 <Button type="primary" @click="upsert">儲存</Button>
                 <Button type="primary" @click="del">刪除</Button>
               </ButtonGroup>
@@ -141,7 +142,7 @@ export default {
         content: "",
         keywords: []
       },
-      speakingContent: false,
+      speaking: false,
       synth: undefined
     };
   },
@@ -156,6 +157,11 @@ export default {
     },
     uploadURL() {
       return `${this.baseUrl}photo`;
+    },
+    toggleSpeakTitle() {
+      if (!this.synth) return "不支援語音";
+      else if (this.speaking) return "中斷";
+      else return "朗誦";
     }
   },
   methods: {
@@ -256,8 +262,18 @@ export default {
           return v.lang === "zh-TW";
         });
 
-        if (twVoice.length >= 1 && this.synth.speaking) {
-          this.speakingContent = true;
+        if (this.synth.speaking) {
+          this.synth.pause();
+          this.synth.cancel();
+        }
+
+        if (this.speaking) {
+          this.speaking = false;
+          return;
+        }
+
+        if (twVoice.length >= 1 && !this.synth.speaking) {
+          this.speaking = true;
           utterThis.voice = twVoice[0];
 
           utterThis.pitch = 1;
@@ -269,7 +285,7 @@ export default {
       }
     },
     onCarouselChanged(oldValue, value) {
-      if (this.synth && oldValue !== value) {
+      if (this.synth && oldValue !== value && !this.speaking && !this.synth.speaking) {
         let voices = this.synth.getVoices();
         let utterThis = new SpeechSynthesisUtterance(
           this.study.keywords[value].key
