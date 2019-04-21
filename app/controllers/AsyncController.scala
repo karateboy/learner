@@ -8,6 +8,7 @@ import play.api._
 import scala.concurrent.duration._
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import models._
+import models.ModelHelper._
 import play.api.libs.json._
 
 /**
@@ -59,15 +60,43 @@ class AsyncController @Inject() (cc: ControllerComponents, actorSystem: ActorSys
         user <- userF
       } yield {
         import Study._
-        if (studies.isEmpty){
+        if (studies.isEmpty) {
           val seq = user.getNextSeq
           userOp.upsert(user)
           Ok(Json.toJson(Study.emptyStudy(userInfo.id, user.getNextSeq)))
-        }else
+        } else
           Ok(Json.toJson(studies(0)))
       }
   }
 
+  def newLandLaw(offset: Int) = Authenticated.async {
+    implicit request =>
+      val userInfo = request.user
+      import LandLaw._
+      val studyF = landLaw.query(QueryParam(userInfo.id))(offset, 2)
+      val userF = userOp.get(userInfo.id)
+      for {
+        studies <- studyF
+        user <- userF
+      } yield {
+        import Study._
+        if (studies.length < 2) {
+          val seq = user.getNextSeq
+          userOp.upsert(user)
+          val study = Study.emptyStudy(userInfo.id, seq)
+          val f = landLaw.upsert(study)
+          f.onComplete(completeHandler)
+          Ok(Json.toJson(study))
+        } else {
+          val seqs = studies map { _.seq }
+          val seq = seqs.sum / 2
+          val study = Study.emptyStudy(userInfo.id, seq)
+          val f = landLaw.upsert(study)
+          f.onComplete(completeHandler)
+          Ok(Json.toJson(study))
+        }
+      }
+  }
   def getLandLawCount = Authenticated.async {
     implicit request =>
       val userInfo = request.user

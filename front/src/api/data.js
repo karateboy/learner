@@ -92,6 +92,18 @@ export const getLandLaw = ({
   })
 }
 
+export const getNewLandLaw = ({
+  offset
+}) => {
+  return axios.request({
+    url: 'landLaw/new',
+    method: 'get',
+    params: {
+      offset
+    }
+  })
+}
+
 export const getLandLawCount = () => {
   return axios.request({
     url: 'landLaw/count',

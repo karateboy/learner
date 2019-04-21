@@ -3,34 +3,38 @@
     <Row>
       <Col>
         <Card>
-          <Form :label-width="80">
+          <Form :label-width="40">
             <FormItem label="進度">
               <Progress :percent="progress">{{`${offset+1}/${count}`}}</Progress>
             </FormItem>
             <FormItem label="內容">
               <Input v-model="study.content" placeholder="..." type="textarea" :rows="4"/>
+              <br>
+              <ButtonGroup>
+                <Button type="primary" :icon="speakButtonIcon" @click="speak">{{speakButtonText}}</Button>
+                <Button type="primary" icon="ios-add" @click="fetchNewLandLaw">新增</Button>
+                <Button type="primary" @click="upsert(true)">儲存</Button>
+                <Button type="primary" icon="ios-trash" @click="del">刪除</Button>
+              </ButtonGroup>
             </FormItem>
 
-            <FormItem>
+            <FormItem label="圖片">
               <ButtonGroup>
-                <Button type="primary" @click="speak">{{toggleSpeakTitle}}</Button>
-                <Button type="primary" @click="show_add_keyword_dlg">增加圖片</Button>
+                <Button type="primary" icon="ios-add" @click="show_add_keyword_dlg">增加</Button>
                 <Button
                   type="primary"
+                  icon="ios-trash"
                   @click="del_keyword_modal=true"
                   :disabled="study.keywords.length === 0"
-                >刪除圖片</Button>
-                <Button type="primary" @click="newStudy">新增</Button>
-                <Button type="primary" @click="upsert">儲存</Button>
-                <Button type="primary" @click="del">刪除</Button>
+                >刪除</Button>
               </ButtonGroup>
             </FormItem>
             <FormItem>
               <ButtonGroup shape="circle">
                 <Button @click="first" icon="ios-skip-backward"></Button>
                 <Button @click="pre" icon="ios-arrow-back" :disabled="offset===0"></Button>
-                <Button @click="next" icon="ios-arrow-forward" :disabled="offset>=count"></Button>
-                <Button @click="last" icon="ios-skip-forward" :disabled="offset>=count"></Button>
+                <Button @click="next" icon="ios-arrow-forward" :disabled="offset+1>=count"></Button>
+                <Button @click="last" icon="ios-skip-forward" :disabled="offset+1>=count"></Button>
               </ButtonGroup>
             </FormItem>
           </Form>
@@ -77,10 +81,10 @@
     </Row>
     <Row>
       <Col v-if="study.keywords.length">
-        <Carousel v-model="keyword_idx" :autoplay="true" @on-change="onCarouselChanged">
+        <Carousel v-model="keyword_idx" @on-change="onCarouselChanged">
           <CarouselItem v-for="keyword in study.keywords" :key="keyword.key">
             <Card :title="keyword.key">
-              <img :src="baseUrl + keyword.url">
+              <img :src="baseUrl + keyword.url" style="width:100%;height:100%">
             </Card>
           </CarouselItem>
         </Carousel>
@@ -93,6 +97,7 @@
 <script>
 import {
   getLandLaw,
+  getNewLandLaw,
   getLandLawCount,
   upsertLandLaw,
   delLandLaw
@@ -158,10 +163,15 @@ export default {
     uploadURL() {
       return `${this.baseUrl}photo`;
     },
-    toggleSpeakTitle() {
+    speakButtonText() {
       if (!this.synth) return "不支援語音";
       else if (this.speaking) return "中斷";
       else return "朗誦";
+    },
+    speakButtonIcon() {
+      if (!this.synth) return "ios-mic-off";
+      else if (this.speaking) return "md-pause";
+      else return "ios-mic";
     }
   },
   methods: {
@@ -185,20 +195,35 @@ export default {
           alert(err);
         });
     },
+    fetchNewLandLaw() {
+      getNewLandLaw({ offset: this.offset })
+        .then(resp => {
+          const data = resp.data;
+          this.offset += 1;
+          this.count += 1;
+          this.study = Object.assign({}, data);
+        })
+        .catch(err => {
+          alert(err);
+        });
+    },
     first() {
+      this.upsert();
       this.offset = 0;
       this.fetchLaw();
     },
     pre() {
+      this.upsert();
       if (this.offset) this.offset -= 1;
-
       this.fetchLaw();
     },
     next() {
+      this.upsert();
       this.offset += 1;
       this.fetchLaw();
     },
     last() {
+      this.upsert();
       this.offset = this.count - 1;
       this.fetchLaw();
     },
@@ -232,10 +257,10 @@ export default {
         }
       });
     },
-    upsert() {
+    upsert(prompt) {
       upsertLandLaw({ study: this.study })
         .then(resp => {
-          this.$Message.info("成功");
+          if (prompt) this.$Message.info("成功");
           this.photoUploaded = false;
         })
         .catch(err => {
@@ -275,9 +300,11 @@ export default {
         if (twVoice.length >= 1 && !this.synth.speaking) {
           this.speaking = true;
           utterThis.voice = twVoice[0];
-
           utterThis.pitch = 1;
           utterThis.rate = 1;
+          utterThis.onend = () => {
+            this.speaking = false;
+          };
           this.synth.speak(utterThis);
         }
       } else {
@@ -285,7 +312,12 @@ export default {
       }
     },
     onCarouselChanged(oldValue, value) {
-      if (this.synth && oldValue !== value && !this.speaking && !this.synth.speaking) {
+      if (
+        this.synth &&
+        oldValue !== value &&
+        !this.speaking &&
+        !this.synth.speaking
+      ) {
         let voices = this.synth.getVoices();
         let utterThis = new SpeechSynthesisUtterance(
           this.study.keywords[value].key
@@ -297,9 +329,11 @@ export default {
 
         if (twVoice.length >= 1 && !this.synth.speaking) {
           utterThis.voice = twVoice[0];
-
           utterThis.pitch = 1;
           utterThis.rate = 1;
+          utterThis.onend = () => {
+            this.speaking = false;
+          };
           this.synth.speak(utterThis);
         }
       }
